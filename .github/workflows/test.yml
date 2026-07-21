@@ -1,0 +1,44 @@
+# Trimmed replica of facebookresearch/fairchem test.yml — preserves the exact
+# vulnerable mechanic: workflow_run after "contributor check" -> checkout PR head
+# commit -> execute it (pip install of a local package runs its setup.py) with a
+# repository secret in the environment. No actor/authorization guard.
+name: tests
+
+on:
+  workflow_run:
+    workflows:
+      - "contributor check"
+    types:
+      - completed
+
+env:
+  HEAD_SHA: |
+    ${{
+      github.event.workflow_run.head_sha ||
+      github.event.pull_request.head.sha ||
+      github.sha
+    }}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout PR head (untrusted)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.HEAD_SHA }}
+          fetch-depth: 0
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      # This is the sink: installing a local package executes its setup.py,
+      # i.e. attacker-controlled code from the PR, with the secret in-env.
+      - name: Install package (executes PR setup.py)
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          python -m pip install --upgrade pip
+          pip install ./packages/pkg
