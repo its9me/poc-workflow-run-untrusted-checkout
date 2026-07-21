@@ -1,13 +1,12 @@
-# Trimmed replica of facebookresearch/fairchem test.yml — preserves the exact
-# vulnerable mechanic: workflow_run after "contributor check" -> checkout PR head
-# commit -> execute it (pip install of a local package runs its setup.py) with a
-# repository secret in the environment. No actor/authorization guard.
+# Faithful trim of facebookresearch/fairchem test.yml at pinned main SHA
+# 475b2e033e20626a8cd2acba86051c649ecf928e.
 #
-# On real fairchem, HF_TOKEN is directly in the setup.py step's env, and
-# CODECOV_TOKEN becomes reachable one step later in the attacker-controlled
-# pytest step. To keep the replica single-step (and unambiguous), all three
-# secrets are exposed together here. The mechanic (attacker code + secrets in
-# env) is identical.
+# Key property vs the earlier setup.py replica: this test.yml matches
+# fairchem's actual step-and-env layout — the `pip install` step has NO
+# secrets in its env, and HF_TOKEN is set only on the subsequent `pytest`
+# step, exactly as in fairchem lines 100-146. Attacker code executes when
+# pytest imports/collects a PR-provided conftest.py, at which point the
+# process environment contains HF_TOKEN.
 name: tests
 
 on:
@@ -30,29 +29,46 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      # fairchem test.yml also grants statuses:write for multi-trigger-setup.
+      # Not needed for the PoC.
     steps:
+      # Same trigger + ref plumbing as fairchem.
       - name: Checkout PR head (untrusted)
         uses: actions/checkout@v4
         with:
           ref: ${{ env.HEAD_SHA }}
           fetch-depth: 0
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      # This is the sink: installing a local package executes its setup.py,
-      # i.e. attacker-controlled code from the PR, with the secrets in env.
-      - name: Install package (executes PR setup.py)
-        env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-          ACTIONS_DEPLOY_KEY: ${{ secrets.ACTIONS_DEPLOY_KEY }}
+
+      # Matches fairchem line 100-113: `pip install packages/fairchem-core[dev,extras]`
+      # with NO env: block on this step. HF_TOKEN is intentionally NOT set here.
+      # A payload placed in setup.py cannot read HF_TOKEN — this is the CORRECTION
+      # of the earlier PoC and is what the triager review demanded.
+      - name: Install core dependencies and package
         run: |
           python -m pip install --upgrade pip
+          pip install pytest
           pip install ./packages/pkg
-      # PoC evidence surface. setup.py writes /tmp/pwn_marker.txt with the
-      # observed secret lengths. We cat it to make the proof visible in the
-      # public run log. The vulnerable mechanic is unchanged.
+
+      # Matches fairchem lines 133-146: `pytest ${{ matrix.shard.paths }}` under
+      # `env: HF_TOKEN: ${{ secrets.HF_TOKEN }}`. This is the step where the
+      # attacker's PR-provided conftest.py (or any test_*.py) is imported by
+      # pytest during collection, giving the attacker code exec inside a
+      # process whose env carries HF_TOKEN.
+      - name: Core tests (units)
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          pytest tests/ -v
+
+      # PoC evidence surface. conftest.py (attacker-controlled, collected by
+      # pytest during test discovery) writes /tmp/pwn_marker.txt with a
+      # length-only observation. This step cats it so the proof appears in
+      # the public run log. The vulnerable mechanic is unchanged.
       - name: Show PoC marker
         if: always()
         run: |
