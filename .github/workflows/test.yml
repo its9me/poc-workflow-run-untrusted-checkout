@@ -42,14 +42,14 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install ./packages/pkg
-# PoC evidence surface: setup.py (attacker-controlled, executed by pip
-# under PEP 517 build isolation which normally swallows backend stdout)
-# also writes /tmp/pwn_marker.txt. Cat it to make the proof visible in
-# this step's log. The vulnerable mechanic (checkout PR head + execute
-# + secret in env) is unchanged.
-- name: Show PoC marker
-  if: always()
-  run: |
-    echo "--- BEGIN PWN MARKER FILE ---"
-    cat /tmp/pwn_marker.txt || echo "(marker file not present)"
-    echo "--- END PWN MARKER FILE ---"
+      # PoC evidence surface: setup.py (attacker-controlled, executed by pip
+      # under PEP 517 build isolation which normally swallows backend stdout)
+      # also writes /tmp/pwn_marker.txt. Cat it to make the proof visible in
+      # this step's log. The vulnerable mechanic (checkout PR head + execute
+      # + secret in env) is unchanged.
+      - name: Show PoC marker
+        if: always()
+        run: |
+          echo "--- BEGIN PWN MARKER FILE ---"
+          cat /tmp/pwn_marker.txt || echo "(marker file not present)"
+          echo "--- END PWN MARKER FILE ---"
