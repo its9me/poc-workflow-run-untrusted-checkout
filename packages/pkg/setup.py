@@ -1,6 +1,7 @@
-# BASELINE package for the upstream main branch (no marker). Rename to setup.py
-# when seeding the maintainer repo. The attacker fork PR replaces it with the
-# marker version (../setup.py in this kit) to demonstrate the injection.
+# Innocuous baseline package. NO payload. On real fairchem this file is
+# named packages/fairchem-core/setup.py and does the equivalent legit build.
+# The attack sink is NOT this file — it is the conftest.py collected by
+# pytest below. See tests/units/conftest.py.
 from setuptools import setup
 
 setup(name="pkg", version="0.0.0", py_modules=[])
