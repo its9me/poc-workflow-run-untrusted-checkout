@@ -1,0 +1,16 @@
+# Replica of facebookresearch/fairchem contributor-check.yml (verbatim mechanic).
+# The "gate" performs no contributor validation and always succeeds.
+name: contributor check
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions: {}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: pass
+        run: echo "passed"
